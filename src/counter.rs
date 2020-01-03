@@ -11,6 +11,7 @@ use crate::desc::Desc;
 use crate::errors::Result;
 use crate::metrics::{Collector, LocalMetric, Metric, Opts};
 use crate::proto;
+use crate::tls::TLSMetricGroup;
 use crate::value::{Value, ValueType};
 use crate::vec::{MetricVec, MetricVecBuilder};
 
@@ -171,12 +172,19 @@ pub struct GenericLocalCounter<P: Atomic> {
     val: RefCell<P::T>,
 }
 
+pub struct AFGenericLocalCounter<'a, P: Atomic, T: LocalMetric> {
+    inner: &'a GenericLocalCounter<P>,
+    local_static_group: Box<TLSMetricGroup<'a, T>>,
+}
+
 /// An unsync [`Counter`](::Counter).
 pub type LocalCounter = GenericLocalCounter<AtomicF64>;
+pub type AFLocalCounter<'a, T> = AFGenericLocalCounter<'a, AtomicF64, T>;
 
 /// The integer version of [`LocalCounter`](::local::LocalCounter). Provides better performance
 /// if metric values are all integers.
 pub type LocalIntCounter = GenericLocalCounter<AtomicI64>;
+pub type AFLocalIntCounter<'a, T> = AFGenericLocalCounter<'a, AtomicI64, T>;
 
 impl<P: Atomic> GenericLocalCounter<P> {
     fn new(counter: GenericCounter<P>) -> Self {
@@ -226,11 +234,70 @@ impl<P: Atomic> GenericLocalCounter<P> {
     }
 }
 
+impl<'a, 'b, P: Atomic, T: LocalMetric> AFGenericLocalCounter<'b, P, T>
+where
+    'a: 'b,
+{
+    fn new(
+        inner: &'a GenericLocalCounter<P>,
+        local_static_group: Box<TLSMetricGroup<'b, T>>,
+    ) -> Self {
+        Self {
+            inner,
+            local_static_group,
+        }
+    }
+
+    /// Increase the given value to the local counter.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug build if the value is < 0.
+    #[inline]
+    pub fn inc_by(&self, v: P::T) {
+        self.inner.inc_by(v);
+        self.local_static_group.may_flush_all();
+    }
+
+    /// Increase the local counter by 1.
+    #[inline]
+    pub fn inc(&self) {
+        self.inner.inc();
+        self.local_static_group.may_flush_all();
+    }
+
+    /// Return the local counter value.
+    #[inline]
+    pub fn get(&self) -> P::T {
+        self.inner.get()
+    }
+
+    /// Restart the counter, resetting its value back to 0.
+    #[inline]
+    pub fn reset(&self) {
+        self.inner.reset()
+    }
+
+    /// Flush the local metrics to the [`Counter`](::Counter).
+    #[inline]
+    pub fn flush(&self) {
+        self.inner.flush();
+    }
+}
+
 impl<P: Atomic> LocalMetric for GenericLocalCounter<P> {
     /// Flush the local metrics to the [`Counter`](::Counter).
     #[inline]
     fn flush(&self) {
         GenericLocalCounter::flush(self);
+    }
+}
+
+impl<P: Atomic, T: LocalMetric> LocalMetric for AFGenericLocalCounter<'_, P, T> {
+    /// Flush the local metrics to the [`Counter`](::Counter).
+    #[inline]
+    fn flush(&self) {
+        AFGenericLocalCounter::flush(self);
     }
 }
 
@@ -316,6 +383,7 @@ mod tests {
 
     use super::*;
     use crate::metrics::{Collector, Opts};
+    use std::borrow::BorrowMut;
 
     #[test]
     fn test_counter() {
@@ -391,6 +459,31 @@ mod tests {
     fn test_int_local_counter() {
         let counter = IntCounter::new("foo", "bar").unwrap();
         let local_counter = counter.local();
+
+        local_counter.inc();
+        assert_eq!(local_counter.get(), 1);
+        assert_eq!(counter.get(), 0);
+
+        local_counter.inc_by(5);
+        local_counter.flush();
+        assert_eq!(local_counter.get(), 0);
+        assert_eq!(counter.get(), 6);
+
+        local_counter.reset();
+        counter.reset();
+        assert_eq!(counter.get() as u64, 0);
+        local_counter.flush();
+        assert_eq!(counter.get() as u64, 0);
+    }
+
+    #[test]
+    fn test_auto_flush_int_local_counter() {
+        let counter = IntCounter::new("foo", "bar").unwrap();
+        let local_counter = counter.local();
+        let local_counter = AFLocalIntCounter::new(
+            &local_counter,
+            Box::new(TLSMetricGroup::new(&local_counter)),
+        );
 
         local_counter.inc();
         assert_eq!(local_counter.get(), 1);

@@ -146,6 +146,7 @@ mod metrics;
 #[cfg(feature = "push")]
 mod push;
 mod registry;
+mod tls;
 mod value;
 mod vec;
 
