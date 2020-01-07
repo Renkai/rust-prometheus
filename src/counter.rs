@@ -174,7 +174,7 @@ pub struct GenericLocalCounter<P: Atomic> {
 
 pub struct AFGenericLocalCounter<'a, P: Atomic, T: LocalMetric> {
     inner: &'a GenericLocalCounter<P>,
-    local_static_group: TLSMetricGroup<'a, T>,
+    local_static_group: Option<TLSMetricGroup<'a, T>>,
 }
 
 /// An unsync [`Counter`](::Counter).
@@ -235,14 +235,18 @@ impl<P: Atomic> GenericLocalCounter<P> {
 }
 
 impl<'a, 'b, P: Atomic, T: LocalMetric> AFGenericLocalCounter<'b, P, T>
-where
-    'a: 'b,
+    where
+        'a: 'b,
 {
-    fn new(inner: &'a GenericLocalCounter<P>, local_static_group: TLSMetricGroup<'b, T>) -> Self {
+    pub fn new(inner: &'a GenericLocalCounter<P>, local_static_group: TLSMetricGroup<'b, T>) -> Self {
         Self {
             inner,
-            local_static_group,
+            local_static_group: Some(local_static_group),
         }
+    }
+
+    pub fn set_tls_metric_group(&mut self, local_static_group: TLSMetricGroup<'b, T>) {
+        self.local_static_group = Some(local_static_group)
     }
 
     /// Increase the given value to the local counter.
@@ -502,7 +506,7 @@ mod tests {
             Opts::new("test_couter_vec", "test counter vec help"),
             &["l1", "l2"],
         )
-        .unwrap();
+            .unwrap();
 
         let mut labels = HashMap::new();
         labels.insert("l1", "v1");
@@ -555,7 +559,7 @@ mod tests {
             Opts::new("test_vec", "test counter vec help"),
             &["l1", "l2"],
         )
-        .unwrap();
+            .unwrap();
 
         assert!(vec.remove_label_values(&["v1", "v2"]).is_err());
         vec.with_label_values(&["v1", "v2"]).inc();
@@ -572,7 +576,7 @@ mod tests {
             Opts::new("test_vec_local", "test counter vec help"),
             &["l1", "l2"],
         )
-        .unwrap();
+            .unwrap();
         let mut local_vec_1 = vec.local();
         let mut local_vec_2 = local_vec_1.clone();
 

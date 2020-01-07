@@ -97,9 +97,9 @@ This library supports four features:
 */
 
 #![allow(
-    clippy::needless_pass_by_value,
-    clippy::new_without_default,
-    clippy::new_ret_no_self
+clippy::needless_pass_by_value,
+clippy::new_without_default,
+clippy::new_ret_no_self
 )]
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
@@ -146,7 +146,7 @@ mod metrics;
 #[cfg(feature = "push")]
 mod push;
 mod registry;
-mod tls;
+pub mod tls;
 mod value;
 mod vec;
 
@@ -159,7 +159,7 @@ pub mod local {
     Unsync local metrics, provides better performance.
 
     */
-    pub use super::counter::{LocalCounter, LocalCounterVec, LocalIntCounter, LocalIntCounterVec};
+    pub use super::counter::{LocalCounter, LocalCounterVec, LocalIntCounter, LocalIntCounterVec, AFLocalCounter, AFLocalIntCounter};
     pub use super::histogram::{LocalHistogram, LocalHistogramTimer, LocalHistogramVec};
     pub use super::metrics::LocalMetric;
 }
