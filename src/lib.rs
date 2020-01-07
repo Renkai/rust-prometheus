@@ -102,7 +102,7 @@ clippy::new_without_default,
 clippy::new_ret_no_self
 )]
 #![deny(missing_docs)]
-#![deny(missing_debug_implementations)]
+//#![deny(missing_debug_implementations)]
 
 /// Protocol buffers format of metrics.
 #[cfg(feature = "protobuf")]
@@ -146,6 +146,7 @@ mod metrics;
 #[cfg(feature = "push")]
 mod push;
 mod registry;
+/// use for auto flush thread local storage
 pub mod tls;
 mod value;
 mod vec;

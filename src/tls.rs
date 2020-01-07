@@ -18,7 +18,7 @@ fn ensure_updater() {
         Updater::new(200).start().unwrap();
     }
 }
-
+/// use for auto flush thread local storage
 #[derive(Debug)]
 pub struct TLSMetricGroup<'a, T: LocalMetric> {
     inner: &'a T,
@@ -29,6 +29,7 @@ impl<'a, 'b, T: LocalMetric> TLSMetricGroup<'b, T>
 where
     'a: 'b,
 {
+    ///new a TLSMetricGroup
     pub fn new(inner: &'a T) -> Self {
         ensure_updater();
         Self {

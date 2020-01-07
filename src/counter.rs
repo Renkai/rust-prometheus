@@ -179,11 +179,14 @@ pub struct AFGenericLocalCounter<'a, P: Atomic, T: LocalMetric> {
 
 /// An unsync [`Counter`](::Counter).
 pub type LocalCounter = GenericLocalCounter<AtomicF64>;
+/// An unsync [`Counter`](::Counter) which will auto flush.
 pub type AFLocalCounter<'a, T> = AFGenericLocalCounter<'a, AtomicF64, T>;
 
 /// The integer version of [`LocalCounter`](::local::LocalCounter). Provides better performance
 /// if metric values are all integers.
 pub type LocalIntCounter = GenericLocalCounter<AtomicI64>;
+/// The integer version of [`AFLocalCounter`](::local::AFLocalCounter). Provides better performance
+/// if metric values are all integers.
 pub type AFLocalIntCounter<'a, T> = AFGenericLocalCounter<'a, AtomicI64, T>;
 
 impl<P: Atomic> GenericLocalCounter<P> {
@@ -257,14 +260,14 @@ impl<'a, 'b, P: Atomic, T: LocalMetric> AFGenericLocalCounter<'b, P, T>
     #[inline]
     pub fn inc_by(&self, v: P::T) {
         self.inner.inc_by(v);
-        self.local_static_group.may_flush_all();
+        self.local_static_group.as_ref().unwrap().may_flush_all();
     }
 
     /// Increase the local counter by 1.
     #[inline]
     pub fn inc(&self) {
         self.inner.inc();
-        self.local_static_group.may_flush_all();
+        self.local_static_group.as_ref().unwrap().may_flush_all();
     }
 
     /// Return the local counter value.

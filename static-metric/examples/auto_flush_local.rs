@@ -6,38 +6,35 @@ extern crate coarsetime;
 extern crate prometheus;
 extern crate prometheus_static_metric;
 
-use std::cell::Cell;
-
-use coarsetime::Instant;
 use prometheus::*;
-use prometheus_static_metric::make_static_metric;
 
 #[allow(unused_imports)]
-use super::*;
 use prometheus::local::*;
-use prometheus::*;
 use prometheus::tls::TLSMetricGroup;
 use std::collections::HashMap;
 use std::thread::LocalKey;
 use std::ops::Deref;
 
 #[allow(missing_copy_implementations)]
-struct LocalHttpRequestStatisticsInner<'a> {
+struct LocalHttpRequestStatisticsInner {
     _foo: LocalIntCounter,
     _bar: LocalIntCounter,
-    pub foo: AFLocalIntCounter<'a, LocalHttpRequestStatisticsInner<'a>>,
-    pub bar: AFLocalIntCounter<'a, LocalHttpRequestStatisticsInner<'a>>,
+    pub foo: AFLocalIntCounter<'static, LocalHttpRequestStatisticsInner>,
+    pub bar: AFLocalIntCounter<'static, LocalHttpRequestStatisticsInner>,
 }
 
-pub struct LocalHttpRequestStatistics<'a> {
-    inner: LocalKey<LocalHttpRequestStatisticsInner<'a>>,
+pub struct LocalHttpRequestStatistics {
+    inner: LocalKey<LocalHttpRequestStatisticsInner>,
 }
 
-impl<'a> Deref for LocalHttpRequestStatistics<'a> {
-    type Target = LocalHttpRequestStatisticsInner<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner.with(|m| m)
+impl Deref for LocalHttpRequestStatistics {
+    type Target = LocalHttpRequestStatisticsInner;
+    //TODO: lifetime mismatch
+    fn deref(&self) -> &'static Self::Target {
+        let res: &'static LocalHttpRequestStatisticsInner = self.inner.with(|m: &'static LocalHttpRequestStatisticsInner| {
+            m
+        });
+        res
     }
 }
 
@@ -111,4 +108,6 @@ pub static TLS_HTTP_COUNTER: LocalHttpRequestStatistics = LocalHttpRequestStatis
     inner: TLS_HTTP_COUNTER_INNER,
 };
 
-fn main() {}
+fn main() {
+    TLS_HTTP_COUNTER.bar.inc();
+}
