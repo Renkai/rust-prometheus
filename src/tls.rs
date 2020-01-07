@@ -19,6 +19,7 @@ fn ensure_updater() {
     }
 }
 
+#[derive(Debug)]
 pub struct TLSMetricGroup<'a, T: LocalMetric> {
     inner: &'a T,
     last_flush_time: Cell<Instant>,

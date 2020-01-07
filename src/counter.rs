@@ -174,7 +174,7 @@ pub struct GenericLocalCounter<P: Atomic> {
 
 pub struct AFGenericLocalCounter<'a, P: Atomic, T: LocalMetric> {
     inner: &'a GenericLocalCounter<P>,
-    local_static_group: Box<TLSMetricGroup<'a, T>>,
+    local_static_group: TLSMetricGroup<'a, T>,
 }
 
 /// An unsync [`Counter`](::Counter).
@@ -238,10 +238,7 @@ impl<'a, 'b, P: Atomic, T: LocalMetric> AFGenericLocalCounter<'b, P, T>
 where
     'a: 'b,
 {
-    fn new(
-        inner: &'a GenericLocalCounter<P>,
-        local_static_group: Box<TLSMetricGroup<'b, T>>,
-    ) -> Self {
+    fn new(inner: &'a GenericLocalCounter<P>, local_static_group: TLSMetricGroup<'b, T>) -> Self {
         Self {
             inner,
             local_static_group,
@@ -480,10 +477,8 @@ mod tests {
     fn test_auto_flush_int_local_counter() {
         let counter = IntCounter::new("foo", "bar").unwrap();
         let local_counter = counter.local();
-        let local_counter = AFLocalIntCounter::new(
-            &local_counter,
-            Box::new(TLSMetricGroup::new(&local_counter)),
-        );
+        let local_counter =
+            AFLocalIntCounter::new(&local_counter, TLSMetricGroup::new(&local_counter));
 
         local_counter.inc();
         assert_eq!(local_counter.get(), 1);
