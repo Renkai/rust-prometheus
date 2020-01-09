@@ -1,6 +1,5 @@
 // Copyright 2014 The Prometheus Authors
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -179,6 +178,16 @@ pub type LocalCounter = GenericLocalCounter<AtomicF64>;
 /// if metric values are all integers.
 pub type LocalIntCounter = GenericLocalCounter<AtomicI64>;
 
+///type for auto flush local delegate to use
+pub trait LocalCounterWithType {
+    ///type for auto flush local delegate to use
+    type ValueType: Atomic;
+}
+
+impl<P: Atomic> LocalCounterWithType for GenericLocalCounter<P> {
+    type ValueType = P;
+}
+
 impl<P: Atomic> GenericLocalCounter<P> {
     fn new(counter: GenericCounter<P>) -> Self {
         Self {
@@ -228,14 +237,15 @@ impl<P: Atomic> GenericLocalCounter<P> {
 }
 
 ///a delegator for static metrics to auto flush
-pub trait AFLocalCounterDelegator<T: 'static + MayFlush, P: Atomic> {
+pub trait AFLocalCounterDelegator<T: 'static + MayFlush, L: LocalCounterWithType> {
+
     #[inline]
     ///get the root local metric for delegate
     fn get_root_metric(&self) -> &'static LocalKey<T>;
 
     #[inline]
     ///get the final counter for delegate
-    fn get_counter<'a>(&self, root_metric: &'a T) -> &'a GenericLocalCounter<P>;
+    fn get_counter<'a>(&self, root_metric: &'a T) -> &'a L;
 
     /// Increase the given value to the local counter,
     /// and try to flush to global
@@ -243,7 +253,7 @@ pub trait AFLocalCounterDelegator<T: 'static + MayFlush, P: Atomic> {
     ///
     /// Panics in debug build if the value is < 0.
     #[inline]
-    fn inc_by(&self, v: P::T) {
+    fn inc_by(&self, v: L::ValueType::T) {
         self.get_root_metric().with(|m| {
             let counter = self.get_counter(m);
             counter.inc_by(v);
@@ -475,7 +485,7 @@ mod tests {
             Opts::new("test_couter_vec", "test counter vec help"),
             &["l1", "l2"],
         )
-        .unwrap();
+            .unwrap();
 
         let mut labels = HashMap::new();
         labels.insert("l1", "v1");
@@ -528,7 +538,7 @@ mod tests {
             Opts::new("test_vec", "test counter vec help"),
             &["l1", "l2"],
         )
-        .unwrap();
+            .unwrap();
 
         assert!(vec.remove_label_values(&["v1", "v2"]).is_err());
         vec.with_label_values(&["v1", "v2"]).inc();
@@ -545,7 +555,7 @@ mod tests {
             Opts::new("test_vec_local", "test counter vec help"),
             &["l1", "l2"],
         )
-        .unwrap();
+            .unwrap();
         let mut local_vec_1 = vec.local();
         let mut local_vec_2 = local_vec_1.clone();
 

@@ -161,6 +161,7 @@ pub mod local {
     */
     pub use super::counter::{
         AFLocalCounterDelegator, LocalCounter, LocalCounterVec, LocalIntCounter, LocalIntCounterVec,
+        LocalCounterWithType
     };
     pub use super::histogram::{LocalHistogram, LocalHistogramTimer, LocalHistogramVec};
     pub use super::metrics::{LocalMetric, MayFlush};

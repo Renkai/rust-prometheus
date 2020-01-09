@@ -78,7 +78,7 @@ struct LocalHttpRequestStatisticsDelegator {
     path: dyn Fn(&LocalHttpRequestStatisticsInner) -> &LocalIntCounter,
 }
 
-impl AFLocalCounterDelegator<LocalHttpRequestStatisticsInner, AtomicI64> for LocalHttpRequestStatisticsDelegator {
+impl AFLocalCounterDelegator<LocalHttpRequestStatisticsInner, LocalIntCounter> for LocalHttpRequestStatisticsDelegator {
     fn get_root_metric(&self) -> &'static LocalKey<LocalHttpRequestStatisticsInner> {
         self.root
     }
