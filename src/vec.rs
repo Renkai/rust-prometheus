@@ -144,6 +144,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
         Ok(values)
     }
 
+    #[inline]
     fn get_or_create_metric(&self, hash: u64, label_values: &[&str]) -> Result<T::M> {
         let children = self.children.read();
         // Check exist first.
