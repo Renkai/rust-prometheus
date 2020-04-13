@@ -146,9 +146,8 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
 
     #[inline]
     fn get_or_create_metric(&self, hash: u64, label_values: &[&str]) -> Result<T::M> {
-        let children = self.children.read();
         // Check exist first.
-        if let Some(metric) = children.get(&hash).cloned() {
+        if let Some(metric) = self.children.read().get(&hash).cloned() {
             return Ok(metric);
         }
 
