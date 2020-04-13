@@ -51,20 +51,11 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
 
     pub fn get_metric_with_label_values(&self, vals: &[&str]) -> Result<T::M> {
         let h = self.hash_label_values(vals)?;
-
-        if let Some(metric) = self.children.read().get(&h).cloned() {
-            return Ok(metric);
-        }
-
         self.get_or_create_metric(h, vals)
     }
 
     pub fn get_metric_with(&self, labels: &HashMap<&str, &str>) -> Result<T::M> {
         let h = self.hash_labels(labels)?;
-
-        if let Some(metric) = self.children.read().get(&h).cloned() {
-            return Ok(metric);
-        }
 
         let vals = self.get_label_values(labels)?;
         self.get_or_create_metric(h, &vals)
@@ -154,13 +145,15 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     }
 
     fn get_or_create_metric(&self, hash: u64, label_values: &[&str]) -> Result<T::M> {
-        let mut children = self.children.write();
+        let children = self.children.read();
         // Check exist first.
         if let Some(metric) = children.get(&hash).cloned() {
             return Ok(metric);
         }
 
         let metric = self.new_metric.build(&self.opts, label_values)?;
+        let mut children = self.children.write();
+
         children.insert(hash, metric.clone());
         Ok(metric)
     }
