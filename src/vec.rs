@@ -154,14 +154,12 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     }
 
     fn get_or_create_metric(&self, hash: u64, label_values: &[&str]) -> Result<T::M> {
-        let mut children = self.children.write();
-        // Check exist first.
-        if let Some(metric) = children.get(&hash).cloned() {
-            return Ok(metric);
-        }
-
-        let metric = self.new_metric.build(&self.opts, label_values)?;
-        children.insert(hash, metric.clone());
+        let metric = self
+            .children
+            .write()
+            .entry(hash)
+            .or_insert_with(|| self.new_metric.build(&self.opts, label_values).unwrap())
+            .clone();
         Ok(metric)
     }
 }
