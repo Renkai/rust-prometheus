@@ -904,7 +904,7 @@ pub struct LocalHistogramVec {
 
 impl LocalHistogramVec {
     fn new(vec: HistogramVec) -> LocalHistogramVec {
-        let local = HashMap::with_capacity(vec.v.children.read().len());
+        let local = HashMap::with_capacity(vec.v.children.len());
         LocalHistogramVec { vec, local }
     }
 

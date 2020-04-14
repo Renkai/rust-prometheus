@@ -133,6 +133,8 @@ extern crate cfg_if;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate dashmap;
+
 #[macro_use]
 mod macros;
 mod atomic64;

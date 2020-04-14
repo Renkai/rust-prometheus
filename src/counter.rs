@@ -276,7 +276,7 @@ pub type LocalIntCounterVec = GenericLocalCounterVec<AtomicI64>;
 
 impl<P: Atomic> GenericLocalCounterVec<P> {
     fn new(vec: GenericCounterVec<P>) -> Self {
-        let local = HashMap::with_capacity(vec.v.children.read().len());
+        let local = HashMap::with_capacity(vec.v.children.len());
         Self { vec, local }
     }
 

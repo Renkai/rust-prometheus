@@ -1,17 +1,17 @@
 // Copyright 2014 The Prometheus Authors
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::collections::HashMap;
 use std::hash::Hasher;
 use std::sync::Arc;
 
 use fnv::FnvHasher;
-use spin::RwLock;
+use dashmap::DashMap;
 
 use crate::desc::{Desc, Describer};
 use crate::errors::{Error, Result};
 use crate::metrics::{Collector, Metric};
 use crate::proto::{MetricFamily, MetricType};
+use std::collections::HashMap;
 
 /// An interface for building a metric vector.
 pub trait MetricVecBuilder: Send + Sync + Clone {
@@ -26,7 +26,7 @@ pub trait MetricVecBuilder: Send + Sync + Clone {
 
 #[derive(Debug)]
 pub(crate) struct MetricVecCore<T: MetricVecBuilder> {
-    pub children: RwLock<HashMap<u64, T::M>>,
+    pub children: Arc<DashMap<u64, T::M>>,
     pub desc: Desc,
     pub metric_type: MetricType,
     pub new_metric: T,
@@ -40,9 +40,8 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
         m.set_help(self.desc.help.clone());
         m.set_field_type(self.metric_type);
 
-        let children = self.children.read();
-        let mut metrics = Vec::with_capacity(children.len());
-        for child in children.values() {
+        let mut metrics = Vec::with_capacity(self.children.len());
+        for child in self.children.iter() {
             metrics.push(child.metric());
         }
         m.set_metric(from_vec!(metrics));
@@ -52,8 +51,8 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     pub fn get_metric_with_label_values(&self, vals: &[&str]) -> Result<T::M> {
         let h = self.hash_label_values(vals)?;
 
-        if let Some(metric) = self.children.read().get(&h).cloned() {
-            return Ok(metric);
+        if let Some(metric) = self.children.get(&h) {
+            return Ok(metric.value().clone());
         }
 
         self.get_or_create_metric(h, vals)
@@ -62,8 +61,8 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     pub fn get_metric_with(&self, labels: &HashMap<&str, &str>) -> Result<T::M> {
         let h = self.hash_labels(labels)?;
 
-        if let Some(metric) = self.children.read().get(&h).cloned() {
-            return Ok(metric);
+        if let Some(metric) = self.children.get(&h) {
+            return Ok(metric.value().clone());
         }
 
         let vals = self.get_label_values(labels)?;
@@ -73,8 +72,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     pub fn delete_label_values(&self, vals: &[&str]) -> Result<()> {
         let h = self.hash_label_values(vals)?;
 
-        let mut children = self.children.write();
-        if children.remove(&h).is_none() {
+        if self.children.remove(&h).is_none() {
             return Err(Error::Msg(format!("missing label values {:?}", vals)));
         }
 
@@ -84,8 +82,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     pub fn delete(&self, labels: &HashMap<&str, &str>) -> Result<()> {
         let h = self.hash_labels(labels)?;
 
-        let mut children = self.children.write();
-        if children.remove(&h).is_none() {
+        if self.children.remove(&h).is_none() {
             return Err(Error::Msg(format!("missing labels {:?}", labels)));
         }
 
@@ -94,7 +91,7 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
 
     /// `reset` deletes all metrics in this vector.
     pub fn reset(&self) {
-        self.children.write().clear();
+        self.children.clear();
     }
 
     pub(crate) fn hash_label_values(&self, vals: &[&str]) -> Result<u64> {
@@ -156,7 +153,6 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
     fn get_or_create_metric(&self, hash: u64, label_values: &[&str]) -> Result<T::M> {
         let metric = self
             .children
-            .write()
             .entry(hash)
             .or_insert_with(|| self.new_metric.build(&self.opts, label_values).unwrap())
             .clone();
@@ -186,7 +182,7 @@ impl<T: MetricVecBuilder> MetricVec<T> {
     pub fn create(metric_type: MetricType, new_metric: T, opts: T::P) -> Result<MetricVec<T>> {
         let desc = opts.describe()?;
         let v = MetricVecCore {
-            children: RwLock::new(HashMap::new()),
+            children: Arc::new(DashMap::new()),
             desc,
             metric_type,
             new_metric,
